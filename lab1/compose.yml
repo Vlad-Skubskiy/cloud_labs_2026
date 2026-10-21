@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: vlad
+      POSTGRES_PASSWORD: 8555
+      POSTGRES_DB: dbname
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vlad -d dbname"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  web:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://vlad:8555@db:5432/dbname
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
