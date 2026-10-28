@@ -14,3 +14,4 @@ venv/
 *.tfstate.backup
 *.tfvars
 .terraform.lock.hcl.DS_Store
+.terraform.lock.hcl
