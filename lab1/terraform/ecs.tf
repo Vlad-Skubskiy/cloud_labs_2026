@@ -1,6 +1,6 @@
 resource "aws_cloudwatch_log_group" "app" {
   name              = "/ecs/notes-api"
-  retention_in_days = 7
+  retention_in_days = 0
 }
 
 resource "aws_ecs_cluster" "main" {
@@ -43,7 +43,7 @@ resource "aws_security_group" "ecs_sg" {
   name   = "notes-ecs-sg"
   vpc_id = aws_vpc.main.id
 
-  # Приймає трафік лише від ALB
+
   ingress {
     from_port       = var.app_port
     to_port         = var.app_port
@@ -76,7 +76,7 @@ resource "aws_ecs_task_definition" "app" {
         containerPort = var.app_port
         protocol      = "tcp"
       }]
-      # Значення береться із Secrets Manager і потрапляє в контейнер як змінна середовища
+
       secrets = [{
         name      = "DATABASE_URL"
         valueFrom = aws_secretsmanager_secret.database_url.arn
@@ -111,6 +111,10 @@ resource "aws_ecs_service" "app" {
     target_group_arn = aws_lb_target_group.app.arn
     container_name   = "notes-api"
     container_port   = var.app_port
+  }
+
+  lifecycle {
+    ignore_changes = [task_definition]
   }
 
   depends_on = [

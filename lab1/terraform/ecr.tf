@@ -1,7 +1,7 @@
 resource "aws_ecr_repository" "app_repo" {
   name                 = "notes-api"
   image_tag_mutability = "MUTABLE"
-  force_delete         = true # щоб terraform destroy працював навіть з образами
+  force_delete         = true 
 
   image_scanning_configuration {
     scan_on_push = true
@@ -9,22 +9,12 @@ resource "aws_ecr_repository" "app_repo" {
 }
 
 locals {
-  image_tag = substr(sha1(join("", [
-    filesha1("${var.app_dir}/Dockerfile"),
-    filesha1("${var.app_dir}/requirements.txt"),
-    filesha1("${var.app_dir}/main.py"),
-    filesha1("${var.app_dir}/models.py"),
-    filesha1("${var.app_dir}/database.py"),
-  ])), 0, 12)
-
-  app_image = "${aws_ecr_repository.app_repo.repository_url}:${local.image_tag}"
+  app_image = "${aws_ecr_repository.app_repo.repository_url}:bootstrap"
 }
 
-# Збирає і пушить образ під час apply, щоб ECS не стартував з неіснуючим образом.
-# Потрібні локально: docker і aws cli з налаштованими credentials.
 resource "null_resource" "build_and_push" {
   triggers = {
-    image = local.app_image
+    repository = aws_ecr_repository.app_repo.repository_url
   }
 
   provisioner "local-exec" {

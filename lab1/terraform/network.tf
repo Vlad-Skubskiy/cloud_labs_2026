@@ -1,9 +1,5 @@
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
-locals { 
-  azs = ["${var.aws_region}a", "${var.aws_region}b"] 
+locals {
+  azs = ["${var.aws_region}a", "${var.aws_region}b"]
 }
 
 resource "aws_vpc" "main" {
@@ -18,7 +14,6 @@ resource "aws_internet_gateway" "igw" {
   tags   = { Name = "notes-igw" }
 }
 
-# Публічні підмережі: лише ALB і NAT
 resource "aws_subnet" "public" {
   count                   = 2
   vpc_id                  = aws_vpc.main.id
@@ -28,7 +23,7 @@ resource "aws_subnet" "public" {
   tags                    = { Name = "notes-public-${count.index}" }
 }
 
-# Приватні підмережі: ECS-задачі і RDS
+
 resource "aws_subnet" "private" {
   count             = 2
   vpc_id            = aws_vpc.main.id

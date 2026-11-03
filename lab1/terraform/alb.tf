@@ -15,28 +15,35 @@ resource "aws_security_group" "alb_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  tags = {
+    Name = "notes-alb-sg"
+  }
 }
 
 resource "aws_lb" "main" {
   name               = "notes-alb"
-  load_balancer_type = "application"
   internal           = false
+  load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
   subnets            = aws_subnet.public[*].id
+
+  tags = {
+    Name = "notes-alb"
+  }
 }
 
 resource "aws_lb_target_group" "app" {
-  name                 = "notes-tg"
-  port                 = var.app_port
-  protocol             = "HTTP"
-  target_type          = "ip"
-  vpc_id               = aws_vpc.main.id
-  deregistration_delay = 10
+  name        = "notes-target-group"
+  port        = var.app_port
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "ip"
 
   health_check {
     path                = "/health"
     matcher             = "200"
-    interval            = 15
+    interval            = 30
     timeout             = 5
     healthy_threshold   = 2
     unhealthy_threshold = 3

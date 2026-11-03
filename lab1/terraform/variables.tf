@@ -13,3 +13,7 @@ variable "app_port" {
   type    = number
   default = 8000
 }
+
+variable "github_repo" {
+  type        = string
+}
