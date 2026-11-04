@@ -3,9 +3,10 @@ name: CD
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - "lab1/terraform/**"
-      - "**.md"
+    paths:
+      - "lab1/**"
+      - "!lab1/terraform/**"
+      - "!**.md"
   workflow_dispatch:
 
 concurrency:
@@ -48,7 +49,7 @@ jobs:
         env:
           IMAGE: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
         run: |
-          docker build -t "$IMAGE" .
+          docker build -t "$IMAGE" lab1
           docker push "$IMAGE"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
