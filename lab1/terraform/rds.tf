@@ -32,7 +32,7 @@ resource "aws_security_group" "rds_sg" {
 
 resource "random_password" "db_password" {
   length  = 16
-  special = false 
+  special = false
 }
 
 
@@ -52,13 +52,13 @@ resource "aws_db_instance" "postgres" {
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
 
-  publicly_accessible = false 
+  publicly_accessible = false
   skip_final_snapshot = true
 }
 
 resource "aws_secretsmanager_secret" "database_url" {
   name                    = "notes-api-database-url"
-  recovery_window_in_days = 0 
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "database_url" {

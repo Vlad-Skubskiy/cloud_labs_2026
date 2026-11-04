@@ -15,5 +15,5 @@ variable "app_port" {
 }
 
 variable "github_repo" {
-  type        = string
+  type = string
 }
