@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches-ignore: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  app-tests:
+    name: API smoke test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Start API and call endpoints
+        run: |
+          uvicorn main:app --port 8000 &
+          for i in $(seq 1 30); do
+            curl -fs -m 2 http://localhost:8000/health && break
+            sleep 1
+          done
+          curl -fs -m 5 http://localhost:8000/health
+          curl -fs -m 5 -X POST "http://localhost:8000/items?name=ci-test&description=hello"
+          curl -fs -m 5 http://localhost:8000/items | grep -q ci-test
+
+  docker:
+    name: Docker image and compose
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_USER: ci
+      POSTGRES_PASSWORD: ci
+      POSTGRES_DB: ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t notes-api:ci .
+
+      - name: Process does not run as root
+        run: |
+          uid=$(docker run --rm --entrypoint id notes-api:ci -u)
+          echo "uid=$uid"
+          test "$uid" != "0"
+
+      - name: Compose up, write data, down, up, data still there
+        run: |
+          wait_api() {
+            for i in $(seq 1 30); do
+              curl -fs -m 2 http://localhost:8000/health >/dev/null && return 0
+              sleep 1
+            done
+            docker compose logs
+            return 1
+          }
+          docker compose up -d --build --wait
+          wait_api
+          curl -fs -m 5 -X POST "http://localhost:8000/items?name=persist-check"
+          docker compose down
+          docker compose up -d --wait
+          wait_api
+          curl -fs -m 5 http://localhost:8000/items | grep -q persist-check
+          docker compose down -v
+
+  terraform:
+    name: Terraform validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
