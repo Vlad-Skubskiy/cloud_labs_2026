@@ -33,6 +33,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+
       - name: Print OIDC sub
         run: |
           TOKEN=$(curl -sH "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
