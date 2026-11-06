@@ -17,7 +17,8 @@ def get_db():
 @app.get("/health")
 def health_check():
     return {
-        "status": "super"
+        "status": "ok",
+        "description": "dsdsds"
     }
 
 @app.get("/items")
