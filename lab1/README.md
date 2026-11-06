@@ -2,59 +2,51 @@
 
 A REST API built with FastAPI that stores data in PostgreSQL. The project can be run locally with Docker Compose and deployed to AWS with Terraform: the container runs on ECS Fargate behind an Application Load Balancer, the database runs on RDS, and the connection string is stored in AWS Secrets Manager.
 
+## App url:
+
+```
+app_url = "http://notes-alb-463991008.eu-north-1.elb.amazonaws.com"
+```
+
 ## Tech Stack
 
-| Component              | Technology                                                             |
-| ---------------------- | ---------------------------------------------------------------------- |
-| Language and framework | Python 3.12, FastAPI, Uvicorn                                          |
-| ORM                    | SQLAlchemy 2.x (psycopg driver)                                        |
-| Database               | PostgreSQL 15                                                          |
-| Containerization       | Docker, Docker Compose                                                 |
-| Infrastructure as code | Terraform >= 1.5 (aws, random, null providers)                         |
-| Cloud                  | AWS: VPC, ALB, ECS Fargate, ECR, RDS, Secrets Manager, CloudWatch, IAM |
+| Component              | Technology                                            |
+| ---------------------- | ----------------------------------------------------- |
+| Language and framework | Python 3.12, FastAPI                                  |
+| ORM                    | SQLAlchemy 2.x                                        |
+| Database               | PostgreSQL                                            |
+| Containerization       | Docker, Docker Compose                                |
+| Infrastructure as code | Terraform >= 1.5                                      |
+| Cloud                  | AWS: VPC, ALB, ECS Fargate, ECR, RDS, CloudWatch, IAM |
+| CI/CD                  | Github Actions, OIDC Role                             |
 
 ## Project Structure
 
 ```
-lab1/
-├── compose.yaml          # Local run: application + PostgreSQL
-├── Dockerfile            # Application image
-├── .dockerignore
-├── requirements.txt      # Python dependencies
-├── main.py               # FastAPI endpoints
-├── database.py           # Database connection (SQLAlchemy)
-├── models.py             # Item model
-└── terraform/
-    ├── providers.tf      # Providers and versions
-    ├── variables.tf      # Input variables
-    ├── network.tf        # VPC, subnets, IGW, NAT, routing
-    ├── alb.tf            # Application Load Balancer, target group, listener
-    ├── ecr.tf            # ECR repository, image build and push
-    ├── ecs.tf            # Cluster, task definition, service, IAM roles
-    ├── rds.tf            # RDS PostgreSQL, password, secret with DATABASE_URL
-    ├── github_oidc.tf    # OIDC provider and role for GitHub Actions
-    └── outputs.tf        # Output values
+vlad-skubskiy-cloud_labs_2026/
+    ├── lab1/
+    │   ├── compose.yaml
+    │   ├── database.py
+    │   ├── Dockerfile
+    │   ├── main.py
+    │   ├── models.py
+    │   ├── requirements.txt
+    │   ├── .dockerignore
+    │   └── terraform/
+    │       ├── alb.tf
+    │       ├── ecr.tf
+    │       ├── ecs.tf
+    │       ├── github_oidc.tf
+    │       ├── network.tf
+    │       ├── outputs.tf
+    │       ├── providers.tf
+    │       ├── rds.tf
+    │       └── variables.tf
+    └── .github/
+        └── workflows/
+            ├── cd.yml
+            └── ci.yml
 ```
-
-## API
-
-| Method | Path                              | Description                                                                      |
-| ------ | --------------------------------- | -------------------------------------------------------------------------------- |
-| GET    | `/health`                         | Health check, returns `{"status": "ok"}`. Used by the load balancer health check |
-| GET    | `/items`                          | List all items                                                                   |
-| POST   | `/items?name=...&description=...` | Create an item. `name` is required, `description` is optional                    |
-
-POST parameters are passed via the query string. The `items` table is created automatically when the application starts (`create_all`).
-
-`Item` model:
-
-| Field       | Type    | Notes       |
-| ----------- | ------- | ----------- |
-| id          | Integer | Primary key |
-| name        | String  | Indexed     |
-| description | String  | Nullable    |
-
-Interactive documentation is available at `/docs` (Swagger UI).
 
 ## Running Locally
 
@@ -70,6 +62,7 @@ Interactive documentation is available at `/docs` (Swagger UI).
    POSTGRES_USER=notes
    POSTGRES_PASSWORD=notes_password
    POSTGRES_DB=notes
+   DATASBASE_URL=notes_url
    ```
 
 2. Start the services:
@@ -78,21 +71,13 @@ Interactive documentation is available at `/docs` (Swagger UI).
    docker compose up --build
    ```
 
-   The application starts only after PostgreSQL passes its health check (`pg_isready`).
+   The application starts only after PostgreSQL passes its health check.
 
-3. Verify that it works:
-
-   ```bash
-   curl http://localhost:8000/health
-   curl -X POST "http://localhost:8000/items?name=test&description=first"
-   curl http://localhost:8000/items
-   ```
-
-4. Stop the services:
+3. Stop the services:
 
    ```bash
-   docker compose down        # keep data
-   docker compose down -v     # also remove the postgres_data volume
+   docker compose down
+   docker compose down -v
    ```
 
 The application reads its connection string from the `DATABASE_URL` environment variable. If it is not set, startup fails with an error. In Compose it is assembled automatically from the `POSTGRES_*` variables.
@@ -111,22 +96,10 @@ The application reads its connection string from the `DATABASE_URL` environment 
 ```bash
 cd terraform
 terraform init
-terraform apply -var="github_repo=<owner>/<repo>"
+terraform apply
 ```
 
-During `apply` the following happens:
-
-1. The network, load balancer, ECR repository, database, and secret are created.
-2. The `null_resource.build_and_push` resource logs in to ECR, builds the image for `linux/amd64`, and pushes it with the `bootstrap` tag.
-3. The task definition and ECS service are created, and the service starts a container from that image.
-
-When it finishes, Terraform prints `app_url`. To verify:
-
-```bash
-curl $(terraform output -raw app_url)/health
-```
-
-The first run may take several minutes: RDS and the NAT Gateway are not created instantly, and the ECS service has `health_check_grace_period_seconds = 60`.
+When it finishes, Terraform prints `app_url`.
 
 ## Infrastructure Architecture
 
@@ -168,19 +141,6 @@ The database is not publicly accessible (`publicly_accessible = false`). The con
 - The full connection string is stored in Secrets Manager (secret `notes-api-database-url`).
 - ECS injects the secret into the container as the `DATABASE_URL` environment variable. The `secretsmanager:GetSecretValue` permission is granted only to the task execution role and only for this secret.
 
-### Compute
-
-- Fargate task: 0.25 vCPU (`cpu = 256`), 512 MB memory, a single instance (`desired_count = 1`).
-- Logs are sent to CloudWatch Logs, log group `/ecs/notes-api`.
-- Target group health check: `GET /health`, expects status 200, 30-second interval.
-
-### Database
-
-- RDS PostgreSQL 15.17, instance class `db.t3.micro`.
-- 20 GB of storage with autoscaling up to 100 GB.
-- Database name `notes`, user `dbadmin`.
-- `skip_final_snapshot = true`: no snapshot is taken when the instance is deleted.
-
 ## Terraform Variables
 
 | Variable      | Type   | Default         | Description                                                       |
@@ -203,28 +163,12 @@ The database is not publicly accessible (`publicly_accessible = false`). The con
 Terraform creates everything needed to deploy from GitHub Actions without long-lived access keys:
 
 - An OIDC provider for `token.actions.githubusercontent.com`.
-- The IAM role `notes-github-actions-deploy`, which can be assumed only from the `main` branch of the repository given in `github_repo`.
+- The IAM role, which can be assumed only from the `main` branch of the repository given in `github_repo`.
 - Minimal role permissions: ECR login and image push to the `notes-api` repository, task definition registration, updates to the `notes-service` service, and `iam:PassRole` only for the ECS execution role.
-
-The ECS service uses `ignore_changes = [task_definition]`, so new task definition revisions registered by the pipeline are not reverted by a subsequent `terraform apply`.
-
-The workflow file itself is not part of this repository. To set it up, take the `github_actions_role_arn` output and use it in the `aws-actions/configure-aws-credentials` step as `role-to-assume`. The workflow must also grant the `id-token: write` and `contents: read` permissions.
 
 ## Cleanup
 
 ```bash
 cd terraform
-terraform destroy -var="github_repo=<owner>/<repo>"
+terraform destroy
 ```
-
-The ECR repository is created with `force_delete = true`, the secret is deleted without a recovery window, and RDS has the final snapshot disabled, so all data is permanently deleted. Remember to run `destroy` after you finish testing: the NAT Gateway, ALB, and RDS are billed hourly.
-
-## Known Limitations
-
-This is a learning project, so several decisions are simplified:
-
-- The load balancer accepts only HTTP (port 80); HTTPS is not configured.
-- There is a single NAT Gateway and a single task instance, so there is no high availability.
-- The log group uses `retention_in_days = 0`, which means logs are kept indefinitely.
-- The database schema is created with `create_all`; migrations (for example, Alembic) are not used.
-- `requirements.txt` includes packages the application itself does not need (for example, `awscli` and `psycopg2-binary`), which could be removed to reduce the image size.
