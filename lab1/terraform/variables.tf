@@ -17,3 +17,12 @@ variable "app_port" {
 variable "github_repo" {
   type = string
 }
+
+variable "project_name" {
+  type        = string
+  default     = "my-app"
+}
+
+variable "budget_email" {
+  type        = string
+}
