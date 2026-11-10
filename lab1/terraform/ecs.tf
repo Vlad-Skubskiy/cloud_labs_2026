@@ -4,7 +4,12 @@ resource "aws_cloudwatch_log_group" "app" {
 }
 
 resource "aws_ecs_cluster" "main" {
-  name = "notes-cluster"
+  name = "${var.project_name}-cluster"
+  
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
 }
 
 resource "aws_iam_role" "ecs_execution_role" {
