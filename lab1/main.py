@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 import models
 from database import engine, SessionLocal
@@ -24,6 +24,13 @@ def health_check():
 @app.get("/items")
 def get_items(db: Session = Depends(get_db)):
     return db.query(models.Item).all()
+
+@app.get("/items/{item_id}")
+def get_item_by_id(item_id: int, db: Session = Depends(get_db)):
+    item = db.query(models.Item).filter(models.Item.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return item
 
 @app.post("/items")
 def post_item(name: str, description: str = None, db: Session = Depends(get_db)):
