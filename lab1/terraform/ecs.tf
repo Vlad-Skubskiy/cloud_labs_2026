@@ -5,7 +5,7 @@ resource "aws_cloudwatch_log_group" "app" {
 
 resource "aws_ecs_cluster" "main" {
   name = "${var.project_name}-cluster"
-  
+
   setting {
     name  = "containerInsights"
     value = "enabled"
@@ -43,34 +43,36 @@ resource "aws_iam_role_policy" "read_db_secret" {
     }]
   })
 }
+
 resource "aws_appautoscaling_target" "ecs_target" {
-  max_capacity = 4
-  min_capacity = 1
-  resource_id = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.app.name}"
+  max_capacity       = 4
+  min_capacity       = 2 # было 1: запас мощности, нет "холодного" старта с одной задачи
+  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.app.name}"
   scalable_dimension = "ecs:service:DesiredCount"
-  service_namespace = "ecs"
+  service_namespace  = "ecs"
 }
 
 resource "aws_appautoscaling_policy" "ecs_policy" {
-  name = "tracking-cpu"
-  policy_type = "TargetTrackingScaling"
-  resource_id = aws_appautoscaling_target.ecs_target.resource_id
+  name               = "tracking-cpu"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.ecs_target.resource_id
   scalable_dimension = aws_appautoscaling_target.ecs_target.scalable_dimension
-  service_namespace = aws_appautoscaling_target.ecs_target.service_namespace
+  service_namespace  = aws_appautoscaling_target.ecs_target.service_namespace
+
   target_tracking_scaling_policy_configuration {
     predefined_metric_specification {
       predefined_metric_type = "ECSServiceAverageCPUUtilization"
     }
 
-    target_value = 60.0
-    scale_in_cooldown = 300
+    target_value       = 50.0 # было 60: реакция начинается раньше, больше запаса по CPU
+    scale_in_cooldown  = 120  # было 300: быстрее вывод (окно в 15 точек всё равно остаётся)
     scale_out_cooldown = 60
   }
 }
+
 resource "aws_security_group" "ecs_sg" {
   name   = "notes-ecs-sg"
   vpc_id = aws_vpc.main.id
-
 
   ingress {
     from_port       = var.app_port
@@ -91,8 +93,8 @@ resource "aws_ecs_task_definition" "app" {
   family                   = "notes-task"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"
-  memory                   = "512"
+  cpu                      = "512"  # было 256
+  memory                   = "1024" # было 512 (для 512 CPU допустимо 1024-4096)
   execution_role_arn       = aws_iam_role.ecs_execution_role.arn
 
   container_definitions = jsonencode([
@@ -125,7 +127,7 @@ resource "aws_ecs_service" "app" {
   name                              = "notes-service"
   cluster                           = aws_ecs_cluster.main.id
   task_definition                   = aws_ecs_task_definition.app.arn
-  desired_count                     = 1
+  desired_count                     = 2 # = min_capacity
   launch_type                       = "FARGATE"
   health_check_grace_period_seconds = 60
 
@@ -142,7 +144,8 @@ resource "aws_ecs_service" "app" {
   }
 
   lifecycle {
-    ignore_changes = [task_definition]
+    # desired_count ведёт автоскейлинг, иначе terraform apply сбросит его обратно
+    ignore_changes = [task_definition, desired_count]
   }
 
   depends_on = [
