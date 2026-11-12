@@ -39,13 +39,18 @@ resource "aws_lb_target_group" "app" {
   protocol    = "HTTP"
   vpc_id      = aws_vpc.main.id
   target_type = "ip"
+
+  load_balancing_algorithm_type = "least_outstanding_requests"
+
+  deregistration_delay = 30
+
   health_check {
     path                = "/health"
     matcher             = "200"
-    interval            = 10
-    timeout             = 5
+    interval            = 5
+    timeout             = 3
     healthy_threshold   = 2
-    unhealthy_threshold = 3
+    unhealthy_threshold = 5
   }
 }
 
