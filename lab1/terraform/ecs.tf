@@ -80,7 +80,10 @@ resource "aws_ecs_task_definition" "app" {
         containerPort = var.app_port
         protocol      = "tcp"
       }]
-
+      environment = [
+     { name = "REDIS_URL",         value = "redis://${aws_elasticache_cluster.redis.cache_nodes[0].address}:6379/0" },
+     { name = "CACHE_TTL_SECONDS", value = "30" },
+    ]
       secrets = [{
         name      = "DATABASE_URL"
         valueFrom = aws_secretsmanager_secret.database_url.arn
