@@ -11,7 +11,7 @@ resource "aws_cloudwatch_dashboard" "queue" {
             ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", aws_lb.main.arn_suffix, { stat = "p50", label = "p50" }]
           ]
           view  = "timeSeries", period = 60, region = var.aws_region
-          title = "API latency (s) - не росте під навантаженням"
+          title = "API latency (s)"
         }
       },
       {
@@ -30,7 +30,7 @@ resource "aws_cloudwatch_dashboard" "queue" {
             ["AWS/SQS", "ApproximateNumberOfMessagesNotVisible", "QueueName", aws_sqs_queue.jobs.name, { label = "in flight" }]
           ]
           view  = "timeSeries", stat = "Maximum", period = 60, region = var.aws_region
-          title = "Довжина черги"
+          title = "Queue length"
           annotations = {
             horizontal = [{ label = "Worker scale-out", value = var.worker_scale_out_backlog }]
           }
@@ -55,7 +55,7 @@ resource "aws_cloudwatch_dashboard" "queue" {
             ["AWS/SQS", "NumberOfMessagesDeleted", "QueueName", aws_sqs_queue.jobs.name, { label = "deleted (processed)" }]
           ]
           view  = "timeSeries", stat = "Sum", period = 60, region = var.aws_region
-          title = "Throughput: надходження vs обробка (msg/min)"
+          title = "Throughput (msg/min)"
         }
       },
       {
@@ -63,7 +63,7 @@ resource "aws_cloudwatch_dashboard" "queue" {
         properties = {
           metrics = [["AWS/SQS", "ApproximateAgeOfOldestMessage", "QueueName", aws_sqs_queue.jobs.name]]
           view    = "timeSeries", stat = "Maximum", period = 60, region = var.aws_region
-          title   = "Вік найстарішого повідомлення (s)"
+          title   = "oldest message time (s)"
         }
       },
       {
