@@ -1,7 +1,0 @@
-Method,Name,Error,Occurrences,First Seen,Last Seen
-GET,GET /health,HTTPError('502 Server Error: Bad Gateway for url: GET /health'),2,2026-11-17T15:56:34Z,2026-11-17T15:56:38Z
-GET,GET /items/{item_id},HTTPError('502 Server Error: Bad Gateway for url: GET /items/{item_id}'),1,2026-11-17T15:55:31Z,2026-11-17T15:55:31Z
-GET,GET /items/{item_id},HTTPError('500 Server Error: Internal Server Error for url: GET /items/{item_id}'),340,2026-11-17T15:55:29Z,2026-11-17T15:56:38Z
-GET,GET /items (list),HTTPError('502 Server Error: Bad Gateway for url: GET /items (list)'),6,2026-11-17T15:55:44Z,2026-11-17T15:56:38Z
-POST,POST /items,HTTPError('502 Server Error: Bad Gateway for url: POST /items'),1,2026-11-17T15:56:35Z,2026-11-17T15:56:35Z
-POST,"POST /items (retry, same key)",CatchResponseError('expected Idempotent-Replay: true'),2,2026-11-17T15:55:29Z,2026-11-17T15:56:36Z
