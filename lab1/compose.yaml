@@ -1,3 +1,11 @@
+x-aws-local: &aws-local
+  SQS_ENDPOINT_URL: http://sqs:9324
+  SQS_QUEUE_NAME: notes-jobs
+  SQS_AUTO_CREATE: "true"
+  AWS_REGION: eu-north-1
+  AWS_ACCESS_KEY_ID: local
+  AWS_SECRET_ACCESS_KEY: local
+
 services:
   redis:
     image: redis:7-alpine
@@ -11,6 +19,8 @@ services:
       retries: 5
   db:
     image: postgres:15-alpine
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -23,11 +33,19 @@ services:
       timeout: 3s
       retries: 5
 
+  sqs:
+    image: softwaremill/elasticmq-native:latest
+    ports:
+      - "9324:9324"
+      - "9325:9325"
+
   web:
     build: .
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379/0
+      WRITE_MODE: ${WRITE_MODE:-async}
+      <<: *aws-local
     ports:
       - "8000:8000"
     depends_on:
@@ -35,5 +53,24 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      sqs:
+        condition: service_started
+
+  worker:
+    build: .
+    command: ["python", "worker.py"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      WORKER_SIMULATED_WORK_MS: ${WORKER_SIMULATED_WORK_MS:-0}
+      WORKER_CHAOS_RATE: ${WORKER_CHAOS_RATE:-0}
+      <<: *aws-local
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      sqs:
+        condition: service_started
 volumes:
   postgres_data:
