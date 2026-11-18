@@ -1,18 +1,15 @@
-# NOTE: remove `aws_appautoscaling_target.ecs_target` and
-# `aws_appautoscaling_policy.ecs_policy` from ecs.tf - they now live here.
-# The target keeps the same resource address, so Terraform state is unchanged.
-
 resource "aws_appautoscaling_target" "ecs_target" {
   max_capacity       = 4
-  min_capacity       = 2
+  min_capacity       = 1
   resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.app.name}"
   scalable_dimension = "ecs:service:DesiredCount"
   service_namespace  = "ecs"
+
+  lifecycle {
+    ignore_changes = [min_capacity, max_capacity]
+  }
 }
 
-# ---------- scale out ----------
-# Target tracking always waits for 3 consecutive 1-minute datapoints (>= 3 min)
-# and its alarm cannot be tuned. Step scaling lets the alarm fire on 1 datapoint.
 resource "aws_appautoscaling_policy" "scale_out" {
   name               = "step-scale-out"
   policy_type        = "StepScaling"
@@ -25,14 +22,13 @@ resource "aws_appautoscaling_policy" "scale_out" {
     metric_aggregation_type = "Average"
     cooldown                = 60
 
-    # bounds are relative to the alarm threshold (60%)
     step_adjustment {
       metric_interval_lower_bound = 0
-      metric_interval_upper_bound = 20 # CPU 60..80% -> +1 task
+      metric_interval_upper_bound = 20
       scaling_adjustment          = 1
     }
     step_adjustment {
-      metric_interval_lower_bound = 20 # CPU >= 80% -> +2 tasks
+      metric_interval_lower_bound = 20
       scaling_adjustment          = 2
     }
   }
@@ -46,14 +42,13 @@ resource "aws_cloudwatch_metric_alarm" "scale_out_cpu" {
   dimensions          = local.ecs_dims
   statistic           = "Average"
   period              = 60
-  evaluation_periods  = 1 # raise to 2 if you see flapping
+  evaluation_periods  = 1
   threshold           = 60
   comparison_operator = "GreaterThanOrEqualToThreshold"
   treat_missing_data  = "notBreaching"
   alarm_actions       = [aws_appautoscaling_policy.scale_out.arn]
 }
 
-# ---------- scale in ----------
 resource "aws_appautoscaling_policy" "scale_in" {
   name               = "step-scale-in"
   policy_type        = "StepScaling"
@@ -67,7 +62,7 @@ resource "aws_appautoscaling_policy" "scale_in" {
     cooldown                = 300
 
     step_adjustment {
-      metric_interval_upper_bound = 0 # CPU below the alarm threshold -> -1 task
+      metric_interval_upper_bound = 0 
       scaling_adjustment          = -1
     }
   }
