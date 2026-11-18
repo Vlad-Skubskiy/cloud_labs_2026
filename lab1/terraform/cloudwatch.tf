@@ -17,7 +17,7 @@ resource "aws_cloudwatch_dashboard" "main" {
             ["ECS/ContainerInsights", "DesiredTaskCount", "ClusterName", aws_ecs_cluster.main.name, "ServiceName", aws_ecs_service.app.name],
             ["ECS/ContainerInsights", "RunningTaskCount", "ClusterName", aws_ecs_cluster.main.name, "ServiceName", aws_ecs_service.app.name]
           ]
-          view = "timeSeries", stat = "Average", period = 60, region = var.aws_region
+          view  = "timeSeries", stat = "Average", period = 60, region = var.aws_region
           title = "Tasks (desired vs running)"
         }
       },
@@ -25,8 +25,8 @@ resource "aws_cloudwatch_dashboard" "main" {
         type = "metric", x = 12, y = 0, width = 12, height = 6
         properties = {
           metrics = [["AWS/ECS", "CPUUtilization", "ClusterName", aws_ecs_cluster.main.name, "ServiceName", aws_ecs_service.app.name]]
-          view = "timeSeries", stat = "Average", period = 60, region = var.aws_region
-          title = "ECS CPU Utilization (%)"
+          view    = "timeSeries", stat = "Average", period = 60, region = var.aws_region
+          title   = "ECS CPU Utilization (%)"
           annotations = {
             horizontal = [
               { label = "Scale-out 60%", value = 60 },
@@ -39,16 +39,16 @@ resource "aws_cloudwatch_dashboard" "main" {
         type = "metric", x = 0, y = 6, width = 8, height = 6
         properties = {
           metrics = [["AWS/ApplicationELB", "RequestCount", "LoadBalancer", aws_lb.main.arn_suffix]]
-          view = "timeSeries", stat = "Sum", period = 60, region = var.aws_region
-          title = "Requests per minute"
+          view    = "timeSeries", stat = "Sum", period = 60, region = var.aws_region
+          title   = "Requests per minute"
         }
       },
       {
         type = "metric", x = 8, y = 6, width = 8, height = 6
         properties = {
           metrics = [["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", aws_lb.main.arn_suffix]]
-          view = "timeSeries", stat = "p95", period = 60, region = var.aws_region
-          title = "p95 latency (s)"
+          view    = "timeSeries", stat = "p95", period = 60, region = var.aws_region
+          title   = "p95 latency (s)"
         }
       },
       {
@@ -58,7 +58,7 @@ resource "aws_cloudwatch_dashboard" "main" {
             ["AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", "LoadBalancer", aws_lb.main.arn_suffix],
             ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", aws_lb.main.arn_suffix]
           ]
-          view = "timeSeries", stat = "Sum", period = 60, region = var.aws_region
+          view  = "timeSeries", stat = "Sum", period = 60, region = var.aws_region
           title = "HTTP 5xx (app vs ALB-generated 502/503/504)"
         }
       },
@@ -66,16 +66,16 @@ resource "aws_cloudwatch_dashboard" "main" {
         type = "metric", x = 0, y = 12, width = 8, height = 6
         properties = {
           metrics = [["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", aws_db_instance.postgres.identifier]]
-          view = "timeSeries", stat = "Average", period = 60, region = var.aws_region
-          title = "RDS CPU (%)"
+          view    = "timeSeries", stat = "Average", period = 60, region = var.aws_region
+          title   = "RDS CPU (%)"
         }
       },
       {
         type = "metric", x = 8, y = 12, width = 8, height = 6
         properties = {
           metrics = [["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", aws_db_instance.postgres.identifier]]
-          view = "timeSeries", stat = "Maximum", period = 60, region = var.aws_region
-          title = "RDS connections"
+          view    = "timeSeries", stat = "Maximum", period = 60, region = var.aws_region
+          title   = "RDS connections"
         }
       },
       {
@@ -85,7 +85,7 @@ resource "aws_cloudwatch_dashboard" "main" {
             ["AWS/ApplicationELB", "HealthyHostCount", "TargetGroup", aws_lb_target_group.app.arn_suffix, "LoadBalancer", aws_lb.main.arn_suffix],
             ["AWS/ApplicationELB", "UnHealthyHostCount", "TargetGroup", aws_lb_target_group.app.arn_suffix, "LoadBalancer", aws_lb.main.arn_suffix]
           ]
-          view = "timeSeries", stat = "Average", period = 60, region = var.aws_region
+          view  = "timeSeries", stat = "Average", period = 60, region = var.aws_region
           title = "Healthy / unhealthy targets"
         }
       }
@@ -122,8 +122,8 @@ resource "aws_cloudwatch_metric_alarm" "cpu_high" {
 resource "aws_cloudwatch_metric_alarm" "latency_high" {
   alarm_name        = "${var.project_name}-high-latency"
   alarm_description = "p95 latency >= 500ms for 2 minutes"
-  namespace = "AWS/ApplicationELB"
-  metric_name         = "TargetResponseTime"
+  namespace         = "AWS/ApplicationELB"
+  metric_name       = "TargetResponseTime"
   dimensions = {
     LoadBalancer = aws_lb.main.arn_suffix
   }
