@@ -17,7 +17,7 @@ app_url = "http://notes-alb-463991008.eu-north-1.elb.amazonaws.com"
 | Database               | PostgreSQL                                            |
 | Containerization       | Docker, Docker Compose                                |
 | Infrastructure as code | Terraform >= 1.5                                      |
-| Cloud                  | AWS: VPC, ALB, ECS Fargate, ECR, RDS, CloudWatch, IAM |
+| Cloud                  | AWS: VPC, ALB, ECS Fargate, ECR, RDS, ElastiCache, SQS, CloudWatch, IAM |
 | CI/CD                  | Github Actions, OIDC Role                             |
 
 ## Project Structure
@@ -165,6 +165,25 @@ Terraform creates everything needed to deploy from GitHub Actions without long-l
 - An OIDC provider for `token.actions.githubusercontent.com`.
 - The IAM role, which can be assumed only from the `main` branch of the repository given in `github_repo`.
 - Minimal role permissions: ECR login and image push to the `notes-api` repository, task definition registration, updates to the `notes-service` service, and `iam:PassRole` only for the ECS execution role.
+
+## Async queue, idempotency, schedule
+
+| Feature | What it does | Details |
+| ------- | ------------ | ------- |
+| Queue (SQS + worker) | `POST /items` enqueues the write and returns `202 Accepted` with a `job_id`; a separate ECS service (`notes-worker-service`, same image, `python worker.py`) writes to PostgreSQL. The worker scales on queue length; a dead-letter queue catches poison messages. Result: `GET /jobs/{job_id}`. | [docs/QUEUE.md](docs/QUEUE.md) |
+| Idempotency | `POST /items` accepts an `Idempotency-Key` header. The first request runs, its response is kept in Redis for 24 h, a repeat returns the stored response without running again. | [docs/IDEMPOTENCY.md](docs/IDEMPOTENCY.md) |
+| Scheduled scaling | Minimum API tasks: 2 during the day, 1 at night (`night_min_capacity`, can be 0). | [docs/SCHEDULE.md](docs/SCHEDULE.md) |
+
+Local run now starts `web`, `worker`, `db`, `redis` and an SQS-compatible `sqs` (ElasticMQ, UI on http://localhost:9325). Set `WRITE_MODE=sync` to get the old synchronous behaviour.
+
+Tests (need Postgres and Redis, e.g. `docker compose up -d db redis`):
+
+```bash
+DATABASE_URL=postgresql+psycopg://notes:notes_password@localhost:5432/notes \
+REDIS_URL=redis://localhost:6379/0 pytest -v
+```
+
+New Terraform variables: `write_mode`, `queue_max_receive_count`, `worker_min_capacity`, `worker_max_capacity`, `worker_concurrency`, `worker_simulated_work_ms`, `worker_scale_out_backlog`, `schedule_timezone`, `day_start_cron`, `night_start_cron`, `day_min_capacity`, `night_min_capacity`, `schedule_max_capacity`.
 
 ## Cleanup
 
