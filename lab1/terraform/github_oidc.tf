@@ -63,13 +63,17 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         Sid      = "EcsDeployService"
         Effect   = "Allow"
         Action   = ["ecs:DescribeServices", "ecs:UpdateService"]
-        Resource = aws_ecs_service.app.id
+        Resource = [aws_ecs_service.app.id, aws_ecs_service.worker.id]
       },
       {
-        Sid      = "PassExecutionRole"
-        Effect   = "Allow"
-        Action   = ["iam:PassRole"]
-        Resource = aws_iam_role.ecs_execution_role.arn
+        Sid    = "PassExecutionAndTaskRoles"
+        Effect = "Allow"
+        Action = ["iam:PassRole"]
+        Resource = [
+          aws_iam_role.ecs_execution_role.arn,
+          aws_iam_role.api_task.arn,
+          aws_iam_role.worker_task.arn,
+        ]
         Condition = {
           StringEquals = { "iam:PassedToService" = "ecs-tasks.amazonaws.com" }
         }

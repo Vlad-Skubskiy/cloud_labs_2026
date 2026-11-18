@@ -5,7 +5,7 @@ resource "aws_cloudwatch_log_group" "app" {
 
 resource "aws_ecs_cluster" "main" {
   name = "${var.project_name}-cluster"
-  
+
   setting {
     name  = "containerInsights"
     value = "enabled"
@@ -70,6 +70,7 @@ resource "aws_ecs_task_definition" "app" {
   cpu                      = "512"
   memory                   = "1024"
   execution_role_arn       = aws_iam_role.ecs_execution_role.arn
+  task_role_arn            = aws_iam_role.api_task.arn
 
   container_definitions = jsonencode([
     {
@@ -81,9 +82,12 @@ resource "aws_ecs_task_definition" "app" {
         protocol      = "tcp"
       }]
       environment = [
-     { name = "REDIS_URL",         value = "redis://${aws_elasticache_cluster.redis.cache_nodes[0].address}:6379/0" },
-     { name = "CACHE_TTL_SECONDS", value = "30" },
-    ]
+        { name = "REDIS_URL", value = "redis://${aws_elasticache_cluster.redis.cache_nodes[0].address}:6379/0" },
+        { name = "CACHE_TTL_SECONDS", value = "30" },
+        { name = "WRITE_MODE", value = var.write_mode },
+        { name = "SQS_QUEUE_URL", value = aws_sqs_queue.jobs.url },
+        { name = "AWS_REGION", value = var.aws_region }
+      ]
       secrets = [{
         name      = "DATABASE_URL"
         valueFrom = aws_secretsmanager_secret.database_url.arn
@@ -121,7 +125,7 @@ resource "aws_ecs_service" "app" {
   }
 
   lifecycle {
-    ignore_changes = [task_definition]
+    ignore_changes = [task_definition, desired_count]
   }
 
   depends_on = [

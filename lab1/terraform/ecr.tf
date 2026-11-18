@@ -14,7 +14,10 @@ locals {
 
 resource "null_resource" "build_and_push" {
   triggers = {
-    repository = aws_ecr_repository.app_repo.repository_url
+    repository   = aws_ecr_repository.app_repo.repository_url
+    app_hash     = sha1(join("", [for f in sort(fileset(var.app_dir, "*.py")) : filesha1("${var.app_dir}/${f}")]))
+    dockerfile   = filesha1("${var.app_dir}/Dockerfile")
+    requirements = filesha1("${var.app_dir}/requirements.txt")
   }
 
   provisioner "local-exec" {
