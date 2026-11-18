@@ -16,7 +16,7 @@ defaults:
 
 jobs:
   app-tests:
-    name: API smoke test
+    name: API smoke test + idempotency tests
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -32,8 +32,18 @@ jobs:
           --health-interval 3s
           --health-timeout 3s
           --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 10
     env:
       DATABASE_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
+      REDIS_URL: redis://localhost:6379/0
     steps:
       - uses: actions/checkout@v4
 
@@ -46,7 +56,12 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Start API and call endpoints
+      - name: Idempotency tests (real Postgres + Redis)
+        run: pytest -v
+
+      - name: Start API (sync mode, no queue in CI) and call endpoints
+        env:
+          WRITE_MODE: sync
         run: |
           uvicorn main:app --port 8000 &
           for i in $(seq 1 30); do
@@ -55,7 +70,7 @@ jobs:
           done
           curl -fs -m 5 http://localhost:8000/health
           curl -fs -m 5 -X POST "http://localhost:8000/items?name=ci-test&description=hello"
-          curl -fs -m 5 http://localhost:8000/items | grep -q ci-test
+          curl -fs -m 5 "http://localhost:8000/items?nocache=true" | grep -q ci-test
 
   docker:
     name: Docker image and compose
@@ -76,7 +91,7 @@ jobs:
           echo "uid=$uid"
           test "$uid" != "0"
 
-      - name: Compose up, write data, down, up, data still there
+      - name: Compose up, write via queue, down, up, data still there
         run: |
           wait_api() {
             for i in $(seq 1 30); do
@@ -86,13 +101,29 @@ jobs:
             docker compose logs
             return 1
           }
+          wait_job_done() {
+            for i in $(seq 1 30); do
+              status=$(curl -fs -m 5 "http://localhost:8000$1" | jq -r .status || true)
+              [ "$status" = "done" ] && return 0
+              sleep 1
+            done
+            docker compose logs
+            return 1
+          }
           docker compose up -d --build --wait
           wait_api
-          curl -fs -m 5 -X POST "http://localhost:8000/items?name=persist-check"
+          resp=$(curl -fs -m 5 -X POST "http://localhost:8000/items?name=persist-check" \
+                   -H "Idempotency-Key: ci-persist-1")
+          echo "$resp"
+          status_url=$(echo "$resp" | jq -r .status_url)
+          wait_job_done "$status_url"
+          resp2=$(curl -fs -m 5 -X POST "http://localhost:8000/items?name=persist-check" \
+                    -H "Idempotency-Key: ci-persist-1")
+          test "$(echo "$resp" | jq -r .job_id)" = "$(echo "$resp2" | jq -r .job_id)"
           docker compose down
           docker compose up -d --wait
           wait_api
-          curl -fs -m 5 http://localhost:8000/items | grep -q persist-check
+          curl -fs -m 5 "http://localhost:8000/items?nocache=true" | grep -q persist-check
           docker compose down -v
 
   terraform:

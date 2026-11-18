@@ -20,6 +20,9 @@ env:
   ECS_SERVICE: notes-service
   TASK_FAMILY: notes-task
   CONTAINER_NAME: notes-api
+  WORKER_SERVICE: notes-worker-service
+  WORKER_TASK_FAMILY: notes-worker-task
+  WORKER_CONTAINER_NAME: notes-worker
 
 jobs:
   ci:
@@ -58,6 +61,29 @@ jobs:
           docker build -t "$IMAGE" lab1
           docker push "$IMAGE"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Download current worker task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$WORKER_TASK_FAMILY" \
+            --query taskDefinition > worker-task-definition.json
+
+      - name: Render worker task definition with the new image
+        id: render-worker
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: worker-task-definition.json
+          container-name: ${{ env.WORKER_CONTAINER_NAME }}
+          image: ${{ steps.build.outputs.image }}
+
+      - name: Deploy worker to ECS and wait for stability
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-worker.outputs.task-definition }}
+          service: ${{ env.WORKER_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          wait-for-minutes: 10
 
       - name: Download current task definition
         run: |
