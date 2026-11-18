@@ -20,7 +20,7 @@ variable "github_repo" {
 
 variable "project_name" {
   type    = string
-  default = "my-app"
+  default = "notes"
 }
 
 variable "budget_email" {
