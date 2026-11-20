@@ -26,9 +26,6 @@
 ```bash
 cd lab1
 ./loadtest/run.sh
-export URL=$(terraform -chdir=terraform output -raw app_url)
-locust -f loadtest/locustfile.py --headless --host "$URL" \
-  --csv loadtest/results/run --html loadtest/results/report.html
 ```
 
 
