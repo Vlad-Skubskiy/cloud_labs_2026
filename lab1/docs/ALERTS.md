@@ -1,13 +1,15 @@
 # Алерти на пошту (CloudWatch → SNS → email)
 
-Конфігурація: [terraform/cloudwatch.tf](../terraform/cloudwatch.tf). Тема SNS `notes-api-alerts`, підписка email на `var.budget_email`, яку треба підтвердити за посиланням з першого листа AWS.
+Конфігурація: [terraform/cloudwatch.tf](../terraform/cloudwatch.tf). Тема SNS `notes-alerts`, підписка email на `var.budget_email`, яку треба підтвердити за посиланням з першого листа AWS.
 
 ## Умова
 
 | Аларм | Метрика | Умова | Дії |
 |---|---|---|---|
-| `notes-api-high-cpu` | `AWS/ECS CPUUtilization`, Average по сервісу | **≥ 70 % у 2 послідовних хвилинних періодах** | `ALARM` і `OK` → SNS |
-| `notes-api-high-latency` | `AWS/ApplicationELB TargetResponseTime`, p95 | ≥ 500 мс у 2 послідовних хвилинних періодах | `ALARM` і `OK` → SNS |
+| `notes-high-cpu` | `AWS/ECS CPUUtilization`, Average по сервісу | **≥ 70 % у 2 послідовних хвилинних періодах** | `ALARM` і `OK` → SNS |
+| `notes-high-latency` | `AWS/ApplicationELB TargetResponseTime`, p95 | ≥ 500 мс у 2 послідовних хвилинних періодах | `ALARM` і `OK` → SNS |
+
+Окремо в [terraform/worker.tf](../terraform/worker.tf) є аларм `notes-dlq-not-empty` (у DLQ ≥ 1 повідомлення → SNS, той самий email): він сигналізує, що запис остаточно не вдався.
 
 `treat_missing_data = notBreaching`: відсутність даних (наприклад, коли трафіку немає) не вважається проблемою і не будить уночі.
 
@@ -23,11 +25,11 @@
 
 ### Лист 1 — ALERT
 
-![alt text](img/alarm.png)
+![Лист ALARM для notes-high-cpu](img/alarm.png)
 
 ### Лист 2 — OK
 
-![alt text](img/ok.png)
+![Лист OK для notes-high-cpu](img/ok.png)
 
 ## Час реакції
 
@@ -54,4 +56,4 @@
 
 1. Алертити за **симптомами**: частка 5xx і p95/p99 латентності.
 2. Критичні алерти надсилати в PagerDuty / Opsgenie / дзвінок або SMS через SNS. Пошта годиться лише для некритичних сповіщень.
-3. Додати аларм на `HealthyHostCount < 1` і на DLQ (`ApproximateNumberOfMessagesVisible > 0`). Це миттєві сигнали про реальну відмову.
+3. Додати аларм на `HealthyHostCount < 1` (ALB без жодного здорового таргета). Це миттєвий сигнал про реальну відмову, як і вже наявний `notes-dlq-not-empty` для черги.
