@@ -13,7 +13,7 @@ from locust import HttpUser, LoadTestShape, between, task
 
 N_USERS = int(os.getenv("LOAD_USERS", "200"))
 RAMP_UP_S = int(os.getenv("RAMP_UP_S", "150"))
-STEADY_S = int(os.getenv("STEADY_S", "300"))
+STEADY_S = int(os.getenv("STEADY_S", "500"))
 RAMP_DOWN_S = int(os.getenv("RAMP_DOWN_S", "120"))
 RETRY_SHARE = float(os.getenv("RETRY_SHARE", "0"))
 JOB_POLLS = 5
