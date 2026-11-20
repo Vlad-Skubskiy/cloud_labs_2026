@@ -15,7 +15,6 @@ N_USERS = int(os.getenv("LOAD_USERS", "200"))
 RAMP_UP_S = int(os.getenv("RAMP_UP_S", "150"))
 STEADY_S = int(os.getenv("STEADY_S", "300"))
 RAMP_DOWN_S = int(os.getenv("RAMP_DOWN_S", "120"))
-# Частка циклів, у яких клієнт повторює POST з тим самим Idempotency-Key (демо завдання 7). 0 = вимкнено.
 RETRY_SHARE = float(os.getenv("RETRY_SHARE", "0"))
 JOB_POLLS = 5
 
