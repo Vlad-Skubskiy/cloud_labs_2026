@@ -87,6 +87,7 @@ resource "aws_ecs_task_definition" "app" {
         { name = "WRITE_MODE", value = var.write_mode },
         { name = "SQS_QUEUE_URL", value = aws_sqs_queue.jobs.url },
         { name = "AWS_REGION", value = var.aws_region }
+        #{ name = "CACHE_ENABLED", value = "false" }
       ]
       secrets = [{
         name      = "DATABASE_URL"
